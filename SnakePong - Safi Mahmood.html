@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Multi-Game Page</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Press+Start+2P"
+    />
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #0f4d92, #3a7bd5);
+        color: #fff;
+        font-family: 'Arial', sans-serif;
+      }
+      #game-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 10px;
+        padding: 20px;
+      }
+      #game-board {
+        display: flex;
+        width: 800px;
+      }
+      #snake-canvas,
+      #pong-canvas {
+        background: #222;
+        border: 2px solid #333;
+        border-radius: 10px;
+      }
+      #score {
+        font-size: 36px;
+        color: #fff;
+        margin: 20px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      /* Styles for the game-over screen */
+      #game-over-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 999;
+      }
+      .game-over-content {
+        background: #222;
+        padding: 20px;
+        text-align: center;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+        color: #fff;
+      }
+      .game-over-content h2 {
+        color: #f00;
+        font-size: 36px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      .game-over-content p {
+        font-size: 24px;
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      .game-over-content button {
+        background: #f00;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 24px;
+        cursor: pointer;
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      .game-over-content button:hover {
+        background: #f44;
+      }
+      .hidden {
+        display: none;
+      }
+      /* Styles for the how-to-play modal */
+      #how-to-play-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .how-to-play-content {
+        background: #222;
+        padding: 20px;
+        text-align: center;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+        color: #fff;
+        font-size: 20px;
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      .how-to-play-content button {
+        background: #f00;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 20px;
+        cursor: pointer;
+        font-family: 'Press Start 2P', sans-serif;
+      }
+      .how-to-play-content button:hover {
+        background: #f44;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="how-to-play-modal">
+      <div class="how-to-play-content">
+        <h2>How to Play</h2>
+        <p>Snake: Use arrow keys to control the snake. Eat red apples to score points. Avoid colliding with walls or yourself.</p>
+        <p>Pong: Move your paddle up and down to hit the ball. Try to prevent the ball from reaching the opponent's side.</p>
+        <p>Both games must be played at the same time. Good luck!</p>
+        <button id="close-how-to-play-button">Close</button>
+      </div>
+    </div>
+    <div id="game-container" class="hidden">
+      <div id="score">Score: 0</div>
+      <div id="game-board">
+        <canvas id="snake-canvas" width="400" height="400"></canvas>
+        <canvas id="pong-canvas" width="400" height="400"></canvas>
+      </div>
+    </div>
+    <div id="game-over-screen" class="hidden">
+      <div class="game-over-content">
+        <h2>Game Over</h2>
+        <p>Your Score: <span id="final-score">0</span></p>
+        <button id="play-again-button">Play Again</button>
+      </div>
+    </div>
+    <script>
+      const howToPlayModal = document.getElementById("how-to-play-modal");
+      const gameContainer = document.getElementById("game-container");
+      const closeHowToPlayButton = document.getElementById("close-how-to-play-button");
+
+      // Hide the game container initially
+      gameContainer.style.display = "none";
+
+      // Show the how-to-play modal when the page loads
+      howToPlayModal.style.display = "flex";
+
+      // Close the how-to-play modal when the "Close" button is clicked
+      closeHowToPlayButton.addEventListener("click", function () {
+        howToPlayModal.style.display = "none";
+        gameContainer.style.display = "flex"; // Show the game container
+        // Start the game after closing the how-to-play modal
+        startSnakeGame();
+        startPongGame();
+      });
+
+      // Define a variable for the combined score
+      let combinedScore = 0;
+      let gameInProgress = false; // Track if a game is in progress
+      let gameOverScreenVisible = false; // Track if the game-over screen is visible
+      let snakeInterval = null; // Store the interval ID for the Snake game
+    
+  // Initialize the final-score element with combinedScore
+      document.getElementById('final-score').textContent = combinedScore;
+
+      // Snake Game Code
+      const snakeCanvas = document.getElementById("snake-canvas");
+      const snakeCtx = snakeCanvas.getContext("2d");
+      const gridSize = 20;
+      const snake = [{ x: 5, y: 5 }];
+      let apple = { x: 10, y: 10 };
+      let direction = "right";
+      let score = 0;
+      let gameInterval;
+
+      function drawSnakePart(part, isHead) {
+        snakeCtx.fillStyle = isHead ? "darkgreen" : "lime";
+        snakeCtx.fillRect(part.x * gridSize, part.y * gridSize, gridSize, gridSize);
+      }
+
+      drawSnakePart(snake[0], true); // Draw the head
+
+      function drawApple() {
+        snakeCtx.fillStyle = "red";
+        snakeCtx.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize, gridSize);
+      }
+
+      function checkCollision(x, y, array) {
+        return array.some((part) => part.x === x && part.y === y);
+      }
+
+      function changeDirection(event) {
+        if (!gameInProgress || gameOverScreenVisible) return; // Don't change direction if the game is not in progress
+        const key = event.keyCode;
+        switch (key) {
+          case 37:
+            direction = "left";
+            break;
+          case 38:
+            direction = "up";
+            break;
+          case 39:
+            direction = "right";
+            break;
+          case 40:
+            direction = "down";
+            break;
+        }
+      }
+
+      function updateGame() {
+        if (!gameInProgress || gameOverScreenVisible) return; // Stop the game loop if not in progress
+
+        let headX = snake[0].x;
+        let headY = snake[0].y;
+
+        switch (direction) {
+          case "left":
+            headX -= 1;
+            break;
+          case "up":
+            headY -= 1;
+            break;
+          case "right":
+            headX += 1;
+            break;
+          case "down":
+            headY += 1;
+            break;
+        }
+
+        if (headX === apple.x && headY === apple.y) {
+          // Snake ate the apple
+          score += 1;
+          combinedScore += 1; // Increase the combined score
+          apple = {
+            x: Math.floor(Math.random() * (snakeCanvas.width / gridSize)),
+            y: Math.floor(Math.random() * (snakeCanvas.height / gridSize)),
+          };
+        } else {
+          // Remove the tail
+          snake.pop();
+        }
+
+        // Check if the snake collides with itself
+        if (checkCollision(headX, headY, snake)) {
+          // Change the color of the entire snake to match the head
+          const snakeHeadColor = "darkgreen";
+          for (let i = 0; i < snake.length; i++) {
+            drawSnakePart(snake[i], true);
+          }
+
+          // Display the game-over screen
+          showGameOverScreen(score);
+
+          return;
+        }
+
+        if (
+          headX < 0 ||
+          headX >= snakeCanvas.width / gridSize ||
+          headY < 0 ||
+          headY >= snakeCanvas.height / gridSize
+        ) {
+          // Display the game-over screen
+          showGameOverScreen(score);
+
+          return;
+        }
+
+        snake.unshift({ x: headX, y: headY });
+        snakeCtx.clearRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+
+        for (let i = 0; i < snake.length; i++) {
+          drawSnakePart(snake[i], i === 0);
+        }
+        drawApple();
+        updateScoreDisplay(); // Update the combined score display
+      }
+
+      function startSnakeGame() {
+        if (snakeInterval) clearInterval(snakeInterval); // Clear the previous interval
+        gameInProgress = true; // Set the game as in progress
+        snake.length = 1;
+        snake[0] = { x: 5, y: 5 };
+        direction = "right";
+        score = 0;
+        apple = { x: 10, y: 10 };
+        snakeInterval = setInterval(updateGame, 100); // Set the interval and store it
+      }
+
+      startSnakeGame();
+      document.addEventListener("keydown", changeDirection);
+
+      // Pong Game Code
+      const pongCanvas = document.getElementById("pong-canvas");
+      const pongCtx = pongCanvas.getContext("2d");
+      const pongWidth = pongCanvas.width;
+      const pongHeight = pongCanvas.height;
+      let paddleY = (pongHeight - 100) / 2;
+      let ballX = 10; // Start on the left side
+      let ballY = pongHeight / 2;
+      let ballSpeedX = 2 + Math.random() * 2;
+      let ballSpeedY = 1 + Math.random() * 2;
+      const ballSize = 20;
+
+      function drawPaddle() {
+        pongCtx.fillStyle = "white";
+        pongCtx.fillRect(pongWidth - 10, paddleY, 10, 100);
+      }
+
+      function drawBall() {
+        pongCtx.fillStyle = "white";
+        pongCtx.fillRect(
+          ballX - ballSize / 2,
+          ballY - ballSize / 2,
+          ballSize,
+          ballSize
+        );
+      }
+
+      function moveBall() {
+        if (!gameInProgress || gameOverScreenVisible) return; // Stop the ball movement if not in progress
+
+        ballX += ballSpeedX;
+        ballY += ballSpeedY;
+
+        if (ballY < 0 || ballY > pongHeight) {
+          ballSpeedY = -ballSpeedY;
+        }
+
+        if (ballX > pongWidth) {
+          // Ball reached opponent's side (win condition)
+          // Display the game-over screen
+          showGameOverScreen(combinedScore);
+          return; // Stop moving the ball
+        }
+
+        if (ballX < 0) {
+          // Ball hit the left side, bounce back to the right
+          ballSpeedX = -ballSpeedX;
+        }
+
+        if (
+          ballX < pongWidth - 20 &&
+          ballX > pongWidth - 30 &&
+          ballY > paddleY &&
+          ballY < paddleY + 100
+        ) {
+          // Ball hit the player's paddle
+          ballSpeedX = -ballSpeedX;
+          combinedScore += 1; // Increase the combined score
+        }
+      }
+
+      function gameOver() {
+        // Display the game-over screen
+        showGameOverScreen(score);
+        clearInterval(gameInterval);
+      }
+
+      function resetBall() {
+        ballX = 10; // Start on the left side
+        ballY = pongHeight / 2;
+        ballSpeedX = 2 + Math.random() * 2;
+        ballSpeedY = 1 + Math.random() * 2;
+      }
+
+      function gameLoop() {
+        if (!gameInProgress || gameOverScreenVisible) return; // Stop the game loop if not in progress
+
+        pongCtx.clearRect(0, 0, pongWidth, pongHeight);
+        drawPaddle();
+        drawBall();
+        moveBall();
+        requestAnimationFrame(gameLoop);
+        updateScoreDisplay(); // Update the combined score display
+      }
+
+      // Add mouse event listener for paddle control
+      pongCanvas.addEventListener("mousemove", function (e) {
+        const mouseY = e.clientY - pongCanvas.getBoundingClientRect().top;
+        paddleY = mouseY - 50; // Adjust for paddle height
+      });
+
+      // Update the score display element in the HTML
+      function updateScoreDisplay() {
+        const scoreDisplay = document.getElementById("score");
+        scoreDisplay.textContent = `Score: ${combinedScore}`;
+      }
+
+      // Function to display the game-over screen
+      function showGameOverScreen(finalScore) {
+        const gameOverScreen = document.getElementById("game-over-screen");
+       const finalScoreDisplay = document.getElementById("final-score");
+finalScoreDisplay.textContent = combinedScore; // Use combinedScore here
+gameOverScreen.style.display = "flex";
+        gameOverScreenVisible = true;
+        gameInProgress = false; // Set the game as not in progress
+      }
+
+      // Function to hide the game-over screen
+      function hideGameOverScreen() {
+        const gameOverScreen = document.getElementById("game-over-screen");
+        gameOverScreen.style.display = "none";
+        gameOverScreenVisible = false;
+      }
+
+      // Add an event listener to the "Play Again" button to restart the games
+      const playAgainButton = document.getElementById("play-again-button");
+      playAgainButton.addEventListener("click", () => {
+        hideGameOverScreen();
+        startSnakeGame(); // Restart the Snake game
+        resetBall(); // Reset the Pong game
+        combinedScore = 0; // Reset the combined score
+        gameInProgress = true; // Set the game as in progress
+        gameLoop(); // Restart the Pong game loop
+      });
+
+      // Make sure to hide the game-over screen initially by adding the "hidden" class
+      hideGameOverScreen();
+
+      // Start the Pong game loop
+      gameLoop();
+    </script>
+  </body>
+</html>
